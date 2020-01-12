@@ -51,6 +51,16 @@ class MainMenu:
 
         self.buttons_rect = self.open_levels_menu_button.get_rect()
 
+    def button_check(self, x, y):  # координаты клика
+        # (315;230) - координаты кнопки play в главном меню
+        if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
+            y > 230 and y < 230 + game.main_menu.buttons_rect[3]):
+            return 'play'
+        # (315;345) - координаты кнопки exit в главном меню
+        if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
+            y > 345 and y < 345 + game.main_menu.buttons_rect[3]):
+            return 'exit'
+
 
 class LevelsMenu(DataBase):
     def __init__(self):
@@ -72,29 +82,71 @@ class LevelsMenu(DataBase):
         screen.blit(game.font.render('Time', True, game.text_color), (250, 50))
         screen.blit(game.font.render('Lives', True, game.text_color), (400, 50))
 
-    def load_scores_table(self):
         self.scores = self.data_base.execute('SELECT level, time, lives FROM User_scores').fetchall()
-        for elem in self.scores:
-            level, time, lives = elem
 
-    def click_check(self):
+    def load_scores_table(self):
+        if len(self.scores) != 0:
+            for elem in self.scores:
+                level, time, lives = elem
+                screen.blit(game.font.render(time, True, game.text_color), (250, 80 + 10 * int(level)))
+                screen.blit(game.font.render(str(lives), True, game.text_color), (400, 80 + 10 * int(level)))
+
+    def add_result_to_db(self, level_num, time, lives, start_lives):
+        new_minutes = str(time // 60)
+        new_seconds = str(time % 60)
+        if int(new_minutes) < 10:
+            new_minutes = '0' + new_minutes + ':'
+        if int(new_seconds) < 10:
+            new_seconds = '0' + new_seconds
+        new_time = new_minutes + new_seconds
+        new_lives = start_lives - lives  # т.е. потраченные жизни
+
+        if len(self.scores) != 0:
+            scores = list(self.scores[0])
+            old_time = scores[1].split(':')
+            old_minutes = int(old_time[0])
+            old_seconds = int(old_time[1])
+            old_time = old_minutes * 60 + old_seconds
+            if time < old_time:
+                self.data_base_cur.execute('UPDATE User_scores SET time=? WHERE level=?', (new_time, level_num))
+
+            old_lives = scores[2]
+            if new_lives < old_lives:
+                self.data_base_cur.execute('UPDATE User_scores SET lives=? WHERE level=?', (new_lives, level_num))
+
+        else:
+            self.data_base_cur.execute('INSERT INTO User_scores(level, time, lives) VALUES(?,?,?)',
+                                                            (level_num, new_time, new_lives))
+
+        self.data_base.commit()
+        self.load_scores_table()
+
+    def button_check(self, x, y):  # x, y - координаты клика
+        # (65;559) - координаты кнопки "back", возвращающей в главное меню
+        if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
+            y > 459 and y < 459 + game.main_menu.buttons_rect[3]):
+            return None, None, 'back'
+
         for elem in self.buttons_data:
-            x1, y1 = elem
-            return x1, y1
+            x1, y1 = elem  # положение кнопки
+
+            if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
+                y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
+                return x1, y1, 'start'
+            return x1, y1, None
 
 class Ball(pygame.sprite.Sprite):
-    image = load_image('ball.png')  #  ЗАГРУЗКА ИЗОБРАЖЕНИЯ В СООТВЕТСТВИИ С ПОКУПКОЙ В ИГРОВОМ МАГАЗИНЕ!!!
+    image = load_image('ball.png')
 
     def __init__(self, ball):
         super().__init__(ball)
         self.ball_image = Ball.image
         self.rect = self.ball_image.get_rect()
-        self.ball_move = False
         self.vx = 3  # скорости по x и y
         self.vy = 3
 
     def update(self):
-        if not self.ball_move:  # если движение шарика не начато, он должен находиться на платформе
+        if not game.level.ball_move:  # если движение шарика не начато, он должен находиться на платформе
             self.rect.x = game.platform.rect.x
             self.rect.y = game.platform.rect.y - self.rect[3]
         else:
@@ -109,29 +161,12 @@ class Ball(pygame.sprite.Sprite):
                 self.vy = -self.vy
 
             if pygame.sprite.spritecollideany(self, bottom_border):
-                self.ball_move = False
-                game.level.lives -= 1  # при падении тратится кол-во попыток
-                if game.level.lives == 0:
-                    sprite_blocks.clear()
-                    blocks.clear()
-                    self.reset()
-                    print('Game over')
+                game.level.ball_fell()
 
             for i, sprite_block in enumerate(sprite_blocks):
                 if pygame.sprite.spritecollideany(self, sprite_block):
                     self.vy = -self.vy
-                    del sprite_blocks[i]
-                    del blocks[i]
-                    if len(blocks) == 0:  # ДОРАБОТАТЬ
-                        print('You win!')
-                        self.reset()
-
-    def reset(self):
-        self.ball_move = False
-        game.in_levels_menu = True
-        game.start_game = False
-        game.open_levels_menu()
-
+                    game.level.break_blocks(i)
 
 
 class Platform(pygame.sprite.Sprite):
@@ -147,7 +182,7 @@ class Platform(pygame.sprite.Sprite):
 
     def update(self):
         x, y = pygame.mouse.get_pos()
-        if x < 5:
+        if x < 5:  # платформа не может заходить за установленные границы
             x = 5
         elif x > width - 5 - self.rect[2]:
             x = width - 5 - self.rect[2]
@@ -173,7 +208,7 @@ class Border(pygame.sprite.Sprite):
 
 class Blocks(pygame.sprite.Sprite):
     image = load_image('block1.png')
-    def __init__(self, block, name, x, y):  # ДОРАБОТАТЬ
+    def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
         self.block_image = Blocks.image
@@ -189,6 +224,7 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.level_info = self.data_base.execute('SELECT num, map, fps, lives FROM Levels').fetchall()
         self.level_info = list(self.level_info[0])
         self.start_time = None
+        self.ball_move = False
         screen.fill((29, 34, 41))
 
 
@@ -203,8 +239,9 @@ class Level(DataBase, pygame.sprite.Sprite):
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
                 for x, elem in enumerate(row[0]):
-                    block = Blocks(pygame.sprite.Group(), 'block1.png', x, y)
-                    blocks.append(block)
+                    if elem == '*':
+                        block = Blocks(pygame.sprite.Group(), x, y)
+                        blocks.append(block)
 
     def start_timer(self):
         self.start_time = pygame.time.get_ticks()  # время старта уровня
@@ -212,12 +249,14 @@ class Level(DataBase, pygame.sprite.Sprite):
     def show_time(self):
         self.time_since_start = (pygame.time.get_ticks() - self.start_time) // 1000
 
-        minute = self.time_since_start // 60
-        seconds = self.time_since_start % 60
-        if minute < 10:
-            minute = '0' + str(minute) + ':'
-        if seconds < 10:
-            seconds = '0' + str(seconds)
+        self.minutes = self.time_since_start // 60
+        self.seconds = self.time_since_start % 60
+        minute, seconds = str(self.minutes), str(self.seconds)
+
+        if self.minutes < 10:
+            minute = '0' + str(self.minutes) + ':'
+        if self.seconds < 10:
+            seconds = '0' + str(self.seconds)
 
         message = 'Time: ' + str(minute) + str(seconds)
         screen.blit(game.font.render(message, True, game.text_color), (1, 2))
@@ -226,6 +265,34 @@ class Level(DataBase, pygame.sprite.Sprite):
         lives = 'Lives: ' + str(self.lives)
         screen.blit(game.font.render(lives, True, game.text_color), (741, 2))
 
+    def ball_fell(self):
+        self.ball_move = False
+        self.lives -= 1  # при падении тратится кол-во попыток
+        if self.lives == 0:
+            self.game_over()
+
+    def break_blocks(self, i):
+        del sprite_blocks[i]
+        del blocks[i]
+        if len(blocks) == 0:
+            self.win()
+
+    def game_over(self):
+        sprite_blocks.clear()
+        blocks.clear()
+        self.complete_level()
+        print('Game over')
+
+    def win(self):
+        self.complete_level()
+        game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
+        print('You win!')
+
+    def complete_level(self):
+        self.ball_move = False
+        game.start_game = False
+        game.open_levels_menu()
+
 
 class Game:
     def __init__(self):
@@ -233,7 +300,10 @@ class Game:
         self.platform = Platform(sprite_platform)
 
         self.font = pygame.font.SysFont('Sans', 24)
-        self.text_color = (73, 248, 254)  # ДОРАБОТАТЬ
+        self.text_color = (73, 248, 254)
+
+        self.font1 = pygame.font.SysFont('Sans', 32)
+        self.text_color = (70, 245, 255)
 
     def open_main_menu(self):
         self.main_menu = MainMenu()
@@ -258,6 +328,7 @@ class Game:
         self.button = load_image(name)
         screen.blit(self.button, coord)
 
+
 game = Game()
 game.open_main_menu()
 
@@ -266,69 +337,86 @@ Border(5, height - 5, width - 5, height - 5, 'bottom')
 Border(5, 50, 5, height - 5, 'left')
 Border(width - 5, 50, width - 5, height - 5, 'right')
 
+def pause():
+    pause = True
+    while pause:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pause = False
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y, = event.pos
 
             if game.start_game:
-                game.ball.ball_move = True  # начало движения шарика
+                game.level.ball_move = True  # начало движения шарика
                 if game.level.lives == game.level.start_lives:  # событие, происходищее только при старте уровня
                     game.level.start_timer()
 
             elif game.in_menu:  # переходы из главного меню
-                # (315;230) - координаты кнопки play в главном меню
-                if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
-                    y > 230 and y < 230 + game.main_menu.buttons_rect[3]):
+                # получение координат кнопки и её имени(play/exit)
+                clicked_button_name = game.main_menu.button_check(x, y)
+                if clicked_button_name == 'play':
                     game.open_levels_menu()  # переход в меню уровней
-                    game.levels_menu.load_scores_table()
-                if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
-                    y > 345 and y < 345 + game.main_menu.buttons_rect[3]):
+                    game.levels_menu.load_scores_table()  # выводит рекорды в меню уровней
+
+                if clicked_button_name == 'exit':
                     running = False  # выход из игры
 
             elif game.in_levels_menu:  # переходы из меню уровней
-                x1, y1 = game.levels_menu.click_check()  # получение координат нажатой кнопки
-                if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
-                        y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
+                # получение координат нажатой кнопки и её имени(start/back)
+                x1, y1, clicked_button_name  = game.levels_menu.button_check(x, y)
+                if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
                     game.start_level()
                     game.level.load_level()
 
-                # (65;559) - координаты кнопки "back", возвращающей в главное меню
-                if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
-                        y > 459 and y < 459 + game.main_menu.buttons_rect[3]):
+                if clicked_button_name == 'back':
                     game.open_main_menu()
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if game.in_menu:
+                    running = False
+
+                if game.in_levels_menu:
+                    game.open_main_menu()
+
+                if game.start_game:
+                    pause()
 
         elif event.type == pygame.MOUSEMOTION:  # меняет стиль кнопок при наведении на них
             x, y, = event.pos
             if game.in_menu:  # кнопки главного меню (play, exit)
-                if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
-                    y > 230 and y < 230 + game.main_menu.buttons_rect[3]):
+                hover_button_name = game.main_menu.button_check(x, y)
+                if hover_button_name == 'play':
+                    # (315;230) - координаты кнопки play в главном меню
                     game.change_button_style('clickedStartButton.png', game.main_menu.open_levels_menu_button,
                                                                                                 (315, 230))
                 else:
                     game.change_button_style('startButton.png', game.main_menu.exit_button, (315, 230))
 
-                if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
-                        y > 345 and y < 345 + game.main_menu.buttons_rect[3]):
+                if hover_button_name == 'exit':
+                    # (315;345) - координаты кнопки exit в главном меню
                     game.change_button_style('clickedExitButton.png', game.main_menu.open_levels_menu_button,
                                                                                                 (315, 345))
                 else:
                     game.change_button_style('exitButton.png', game.main_menu.exit_button, (315, 345))
 
             elif game.in_levels_menu:
-                x1, y1 = game.levels_menu.click_check()  # получение координат нажатой кнопки
-                if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
-                        y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
+                x1, y1, hover_button_name = game.levels_menu.button_check(x, y)  # получение координат нажатой кнопки
+                if hover_button_name == 'start':
                     game.change_button_style('clickedStartLevelButton.png', game.levels_menu.start_game_button,
                                                                                                     (x1, y1))
-                else:
+                if not hover_button_name:  # переводит кнопку старта в обычное состояние
                     game.change_button_style('startLevelButton.png', game.levels_menu.start_game_button,
                                                                                                 (x1, y1))
-                if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
-                        y > 459 and y < 459 + game.main_menu.buttons_rect[3]):
+                if hover_button_name == 'back':
+                    # (65;559) - координаты кнопки "back", возвращающей в главное меню
                     game.change_button_style('clickedBackButton.png', game.levels_menu.start_game_button,
                                                                                                 (65, 459))
                 else:
