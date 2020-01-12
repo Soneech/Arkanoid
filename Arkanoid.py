@@ -247,6 +247,7 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.start_time = pygame.time.get_ticks()  # время старта уровня
 
     def show_time(self):
+        self.time_since_start1 = (pygame.time.get_ticks() - self.start_time)  # в миллисекундах
         self.time_since_start = (pygame.time.get_ticks() - self.start_time) // 1000
 
         self.minutes = self.time_since_start // 60
@@ -340,10 +341,14 @@ Border(width - 5, 50, width - 5, height - 5, 'right')
 def pause():
     pause = True
     while pause:
+        time = pygame.time.get_ticks()
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pause = False
+                    # время, проведённое "в паузе"
+                    pause_time = time - game.level.time_since_start1 - game.level.start_time
+                    game.level.start_time += pause_time
 
 while running:
     for event in pygame.event.get():
