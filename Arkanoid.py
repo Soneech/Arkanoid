@@ -121,19 +121,19 @@ class LevelsMenu(DataBase):
         self.data_base.commit()
         self.load_scores_table()
 
-    def button_check(self, x, y):  # x, y - координаты клика
-        # (65;559) - координаты кнопки "back", возвращающей в главное меню
+    def start_buttons_check(self, x, y):  # x, y - координаты клика
+        # for elem in self.buttons_data:
+        #     x1, y1 = elem  # положение кнопки
+        if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
+            y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
+            return 'start'
+        # return x1, y1, None
+
+    def back_button_ckeck(self, x, y):  # x, y - координаты клика
         if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
             y > 459 and y < 459 + game.main_menu.buttons_rect[3]):
-            return None, None, 'back'
+            return 'back'
 
-        for elem in self.buttons_data:
-            x1, y1 = elem  # положение кнопки
-
-            if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
-                y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
-                return x1, y1, 'start'
-            return x1, y1, None
 
 class Ball(pygame.sprite.Sprite):
     image = load_image('ball.png')
@@ -285,8 +285,10 @@ class Level(DataBase, pygame.sprite.Sprite):
         print('Game over')
 
     def win(self):
-        self.complete_level()
+        sprite_blocks.clear()
+        blocks.clear()
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
+        self.complete_level()
         print('You win!')
 
     def complete_level(self):
@@ -316,7 +318,9 @@ class Game:
         pygame.mouse.set_visible(True)
         self.in_levels_menu = True
         self.in_menu = False
+        self.start_game = False
         self.levels_menu = LevelsMenu()
+        self.levels_menu.load_scores_table()
 
     def start_level(self):
         pygame.mouse.set_visible(False)
@@ -344,7 +348,7 @@ def pause():
         time = pygame.time.get_ticks()
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if event.key == pygame.K_SPACE:
                     pause = False
                     # время, проведённое "в паузе"
                     pause_time = time - game.level.time_since_start1 - game.level.start_time
@@ -368,18 +372,22 @@ while running:
                 clicked_button_name = game.main_menu.button_check(x, y)
                 if clicked_button_name == 'play':
                     game.open_levels_menu()  # переход в меню уровней
-                    game.levels_menu.load_scores_table()  # выводит рекорды в меню уровней
 
                 if clicked_button_name == 'exit':
                     running = False  # выход из игры
 
             elif game.in_levels_menu:  # переходы из меню уровней
                 # получение координат нажатой кнопки и её имени(start/back)
-                x1, y1, clicked_button_name  = game.levels_menu.button_check(x, y)
-                if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
-                    game.start_level()
-                    game.level.load_level()
+                for coord in game.levels_menu.buttons_data:
+                    x, y = event.pos
+                    x1, y1 = coord
+                    clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
+                    if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
+                        game.start_level()
+                        game.level.load_level()
 
+                x, y = event.pos
+                clicked_button_name = game.levels_menu.back_button_ckeck(x, y)
                 if clicked_button_name == 'back':
                     game.open_main_menu()
 
@@ -391,6 +399,9 @@ while running:
                 if game.in_levels_menu:
                     game.open_main_menu()
 
+                if game.start_game:
+                    game.open_levels_menu()
+            if event.key == pygame.K_SPACE:
                 if game.start_game:
                     pause()
 
@@ -413,13 +424,17 @@ while running:
                     game.change_button_style('exitButton.png', game.main_menu.exit_button, (315, 345))
 
             elif game.in_levels_menu:
-                x1, y1, hover_button_name = game.levels_menu.button_check(x, y)  # получение координат нажатой кнопки
-                if hover_button_name == 'start':
-                    game.change_button_style('clickedStartLevelButton.png', game.levels_menu.start_game_button,
+                for coord in game.levels_menu.buttons_data:
+                    x, y = event.pos
+                    x1, y1 = coord
+                    hover_button_name = game.levels_menu.start_buttons_check(x, y)
+                    if hover_button_name == 'start':
+                        game.change_button_style('clickedStartLevelButton.png', game.levels_menu.start_game_button,
+                                                                                                        (x1, y1))
+                    if not hover_button_name:  # переводит кнопку старта в обычное состояние
+                        game.change_button_style('startLevelButton.png', game.levels_menu.start_game_button,
                                                                                                     (x1, y1))
-                if not hover_button_name:  # переводит кнопку старта в обычное состояние
-                    game.change_button_style('startLevelButton.png', game.levels_menu.start_game_button,
-                                                                                                (x1, y1))
+                hover_button_name = game.levels_menu.back_button_ckeck(x, y)
                 if hover_button_name == 'back':
                     # (65;559) - координаты кнопки "back", возвращающей в главное меню
                     game.change_button_style('clickedBackButton.png', game.levels_menu.start_game_button,
@@ -427,6 +442,7 @@ while running:
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
                                                                                                 (65, 459))
+                pygame.display.flip()
 
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
