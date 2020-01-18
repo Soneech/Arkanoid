@@ -4,14 +4,14 @@ import sqlite3
 import csv
 
 pygame.init()
-size = width, height, = 810, 600
+size = width, height, = 810, 650
 screen = pygame.display.set_mode(size)
 
 running = True
 sprite_ball = pygame.sprite.Group()
 sprite_platform = pygame.sprite.Group()
 sprite_blocks = []  # списко блоков-спрайтов
-blocks = []  # список экземпляров класса Block
+sprite_break_blocks = []
 
 top_border = pygame.sprite.Group()
 bottom_border = pygame.sprite.Group()
@@ -162,7 +162,7 @@ class Ball(pygame.sprite.Sprite):
                 game.level.ball_fell()
 
             for i, sprite_block in enumerate(sprite_blocks):
-                if pygame.sprite.spritecollideany(self, sprite_block):
+                if pygame.sprite.spritecollideany(self, sprite_block[0]):
                     self.vy = -self.vy
                     game.level.break_blocks(i)
 
@@ -176,7 +176,7 @@ class Platform(pygame.sprite.Sprite):
         self.platform_image = Platform.image
         self.rect = self.platform_image.get_rect()
         self.rect.x = width // 2 - self.rect[2] // 2
-        self.rect.y = (height - 200)
+        self.rect.y = (height - 170)
 
     def update(self):
         x, y = pygame.mouse.get_pos()
@@ -205,7 +205,7 @@ class Border(pygame.sprite.Sprite):
 
 
 class GreyBlock(pygame.sprite.Sprite):
-    image = load_image('block1.png')
+    image = load_image('grey_block.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -213,11 +213,35 @@ class GreyBlock(pygame.sprite.Sprite):
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append(block)
+        sprite_blocks.append([block, 'grey'])
+
+
+class BreakBlock(pygame.sprite.Sprite):
+    image = load_image('break_block.png')
+    def __init__(self, block, x, y):
+        super().__init__(block)
+        self.add(block)
+        self.block_image = GreyBlock.image
+        self.rect = self.block_image.get_rect()
+        self.rect.x = self.rect[2] * x + 5
+        self.rect.y = self.rect[3] * y + 50
+        sprite_break_blocks.append([block, 'break'])
 
 
 class BlueBlock(pygame.sprite.Sprite):
-    image = load_image('block1.png')
+    image = load_image('blue_block.png')
+    def __init__(self, block, x, y):
+        super().__init__(block)
+        self.add(block)
+        self.block_image = BlueBlock.image
+        self.rect = self.block_image.get_rect()
+        self.rect.x = self.rect[2] * x + 5
+        self.rect.y = self.rect[3] * y + 50
+        sprite_blocks.append([block, 'blue'])
+
+
+class VioletBlock(pygame.sprite.Sprite):
+    image = load_image('violet_block.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -225,31 +249,19 @@ class BlueBlock(pygame.sprite.Sprite):
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append(block)
-
-
-class WhiteBlock(pygame.sprite.Sprite):
-    image = load_image('block1.png')
-    def __init__(self, block, x, y):
-        super().__init__(block)
-        self.add(block)
-        self.block_image = GreyBlock.image
-        self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
-        self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append(block)
+        sprite_blocks.append([block, 'violet'])
 
 
 class PurpleBlock(pygame.sprite.Sprite):
-    image = load_image('block1.png')
+    image = load_image('purple_block.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
-        self.block_image = GreyBlock.image
+        self.block_image = PurpleBlock.image
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append(block)
+        sprite_blocks.append([block, 'purple'])
 
 
 class Level(DataBase, pygame.sprite.Sprite):
@@ -273,12 +285,16 @@ class Level(DataBase, pygame.sprite.Sprite):
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
                 for x, block_style in enumerate(row[0]):
+                    if block_style != '_':
+                        # сломанные блоки создаются на каждый существующий блок,
+                        # но заменяются только серые блоки
+                        BreakBlock(pygame.sprite.Group(), x, y)
                     if block_style == 'g':
                         GreyBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'b':
                         BlueBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'w':
-                        WhiteBlock(pygame.sprite.Group(), x, y)
+                        VioletBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'p':
                         PurpleBlock(pygame.sprite.Group(), x, y)
 
@@ -309,25 +325,24 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.ball_move = False
         self.lives -= 1  # при падении тратится кол-во попыток
         if self.lives == 0:
-            self.game_over()
+            self.complete_level()
 
     def break_blocks(self, i):
-        del sprite_blocks[i]
+        if sprite_blocks[i][1] == 'grey':
+            sprite_blocks[i] = sprite_break_blocks[i]
+        else:
+            del sprite_blocks[i]
+            del sprite_break_blocks[i]
+
         if len(sprite_blocks) == 0:
             self.win()
 
-    def game_over(self):
-        sprite_blocks.clear()
-        self.complete_level()
-        # print('Game over')
-
     def win(self):
-        sprite_blocks.clear()
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
         self.complete_level()
-        # print('You win!')
 
     def complete_level(self):
+        sprite_blocks.clear()
         self.ball_move = False
         game.start_game = False
         game.open_levels_menu()
@@ -441,7 +456,7 @@ while running:
                     game.open_main_menu()
 
                 if game.start_game:
-                    game.open_levels_menu()
+                    game.level.complete_level()
             if event.key == pygame.K_SPACE:
                 if game.start_game:
                     pause()
@@ -500,7 +515,7 @@ while running:
         sprite_platform.draw(screen)
 
         for block in sprite_blocks:
-            block.draw(screen)
+            block[0].draw(screen)
 
         sprite_platform.update()
         sprite_ball.update()
