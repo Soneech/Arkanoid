@@ -10,8 +10,8 @@ screen = pygame.display.set_mode(size)
 running = True
 sprite_ball = pygame.sprite.Group()
 sprite_platform = pygame.sprite.Group()
-sprite_blocks = []
-blocks = []
+sprite_blocks = []  # списко блоков-спрайтов
+blocks = []  # список экземпляров класса Block
 
 top_border = pygame.sprite.Group()
 bottom_border = pygame.sprite.Group()
@@ -42,6 +42,7 @@ class MainMenu:
     def __init__(self):
         self.background = load_image('background.png')
         screen.blit(self.background, (0, 0))
+        screen.blit(game.font1.render('A R K A N O I D', True, game.text_color1), (284, 130))
 
         self.open_levels_menu_button = load_image('startButton.png')
         screen.blit(self.open_levels_menu_button, (315, 230))
@@ -88,10 +89,10 @@ class LevelsMenu(DataBase):
         if len(self.scores) != 0:
             for elem in self.scores:
                 level, time, lives = elem
-                screen.blit(game.font.render(time, True, game.text_color), (250, 80 + 10 * int(level)))
-                screen.blit(game.font.render(str(lives), True, game.text_color), (400, 80 + 10 * int(level)))
+                screen.blit(game.font.render(time, True, game.text_color), (250, 90 + 95 * int(level - 1)))
+                screen.blit(game.font.render(str(lives), True, game.text_color), (400, 90 + 95 * int(level - 1)))
 
-    def add_result_to_db(self, level_num, time, lives, start_lives):
+    def add_result_to_db(self, level_num, time, lives, start_lives):  # level_num - номер уровня, начиная с 0
         new_minutes = str(time // 60)
         new_seconds = str(time % 60)
         if int(new_minutes) < 10:
@@ -101,33 +102,30 @@ class LevelsMenu(DataBase):
         new_time = new_minutes + new_seconds
         new_lives = start_lives - lives  # т.е. потраченные жизни
 
-        if len(self.scores) != 0:
-            scores = list(self.scores[0])
+        if len(self.scores) == level_num + 1:
+            scores = list(self.scores[level_num])
             old_time = scores[1].split(':')
             old_minutes = int(old_time[0])
             old_seconds = int(old_time[1])
             old_time = old_minutes * 60 + old_seconds
             if time < old_time:
-                self.data_base_cur.execute('UPDATE User_scores SET time=? WHERE level=?', (new_time, level_num))
+                self.data_base_cur.execute('UPDATE User_scores SET time=? WHERE level=?', (new_time, level_num + 1))
 
             old_lives = scores[2]
             if new_lives < old_lives:
-                self.data_base_cur.execute('UPDATE User_scores SET lives=? WHERE level=?', (new_lives, level_num))
+                self.data_base_cur.execute('UPDATE User_scores SET lives=? WHERE level=?', (new_lives, level_num + 1))
 
         else:
             self.data_base_cur.execute('INSERT INTO User_scores(level, time, lives) VALUES(?,?,?)',
-                                                            (level_num, new_time, new_lives))
+                                                            (level_num + 1, new_time, new_lives))
 
         self.data_base.commit()
         self.load_scores_table()
 
-    def start_buttons_check(self, x, y):  # x, y - координаты клика
-        # for elem in self.buttons_data:
-        #     x1, y1 = elem  # положение кнопки
+    def start_buttons_check(self, x, y):  # x и y - координаты клика, x1 и y1 - координаты кнопок
         if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
             y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
             return 'start'
-        # return x1, y1, None
 
     def back_button_ckeck(self, x, y):  # x, y - координаты клика
         if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
@@ -219,17 +217,17 @@ class Blocks(pygame.sprite.Sprite):
 
 
 class Level(DataBase, pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, level_num):  # level_num - номер уровня, начиная с 0
         super().__init__()
         self.level_info = self.data_base.execute('SELECT num, map, fps, lives FROM Levels').fetchall()
-        self.level_info = list(self.level_info[0])
+        self.level_info = list(self.level_info[level_num])
         self.start_time = None
         self.ball_move = False
         screen.fill((29, 34, 41))
 
 
     def load_level(self):
-        self.level_num = self.level_info[0]
+        self.level_num = level_num
         self.level_map_file = self.level_info[1]
         self.fps = self.level_info[2]
         self.lives = self.level_info[3]
@@ -240,8 +238,7 @@ class Level(DataBase, pygame.sprite.Sprite):
             for y, row in enumerate(level_map):
                 for x, elem in enumerate(row[0]):
                     if elem == '*':
-                        block = Blocks(pygame.sprite.Group(), x, y)
-                        blocks.append(block)
+                        Blocks(pygame.sprite.Group(), x, y)
 
     def start_timer(self):
         self.start_time = pygame.time.get_ticks()  # время старта уровня
@@ -274,22 +271,19 @@ class Level(DataBase, pygame.sprite.Sprite):
 
     def break_blocks(self, i):
         del sprite_blocks[i]
-        del blocks[i]
-        if len(blocks) == 0:
+        if len(sprite_blocks) == 0:
             self.win()
 
     def game_over(self):
         sprite_blocks.clear()
-        blocks.clear()
         self.complete_level()
-        print('Game over')
+        # print('Game over')
 
     def win(self):
         sprite_blocks.clear()
-        blocks.clear()
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
         self.complete_level()
-        print('You win!')
+        # print('You win!')
 
     def complete_level(self):
         self.ball_move = False
@@ -305,8 +299,8 @@ class Game:
         self.font = pygame.font.SysFont('Sans', 24)
         self.text_color = (73, 248, 254)
 
-        self.font1 = pygame.font.SysFont('Sans', 32)
-        self.text_color = (70, 245, 255)
+        self.font1 = pygame.font.SysFont('Sans', 40, True)  # шрифт для заставки(bold)
+        self.text_color1 = (70, 245, 255)
 
     def open_main_menu(self):
         self.main_menu = MainMenu()
@@ -322,13 +316,13 @@ class Game:
         self.levels_menu = LevelsMenu()
         self.levels_menu.load_scores_table()
 
-    def start_level(self):
+    def start_level(self, level_num):
         pygame.mouse.set_visible(False)
         self.in_levels_menu = False
         self.start_game = True
-        self.level = Level()
+        self.level = Level(level_num)
 
-    def change_button_style(self, name, button, coord):  # меняет стиль кнопки или её состояние
+    def change_button_style(self, name, button, coord):  # меняет стиль кнопки
         self.button = button
         self.button = load_image(name)
         screen.blit(self.button, coord)
@@ -378,12 +372,12 @@ while running:
 
             elif game.in_levels_menu:  # переходы из меню уровней
                 # получение координат нажатой кнопки и её имени(start/back)
-                for coord in game.levels_menu.buttons_data:
+                for level_num, coord in enumerate(game.levels_menu.buttons_data):
                     x, y = event.pos
-                    x1, y1 = coord
+                    x1, y1 = coord  # координаты кнопок
                     clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
                     if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
-                        game.start_level()
+                        game.start_level(level_num)
                         game.level.load_level()
 
                 x, y = event.pos
@@ -405,7 +399,7 @@ while running:
                 if game.start_game:
                     pause()
 
-        elif event.type == pygame.MOUSEMOTION:  # меняет стиль кнопок при наведении на них
+        elif event.type == pygame.MOUSEMOTION:  # смена стиля кнопок при наведении на них
             x, y, = event.pos
             if game.in_menu:  # кнопки главного меню (play, exit)
                 hover_button_name = game.main_menu.button_check(x, y)
@@ -426,7 +420,7 @@ while running:
             elif game.in_levels_menu:
                 for coord in game.levels_menu.buttons_data:
                     x, y = event.pos
-                    x1, y1 = coord
+                    x1, y1 = coord  # координаты кнопок
                     hover_button_name = game.levels_menu.start_buttons_check(x, y)
                     if hover_button_name == 'start':
                         game.change_button_style('clickedStartLevelButton.png', game.levels_menu.start_game_button,
@@ -442,7 +436,7 @@ while running:
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
                                                                                                 (65, 459))
-                pygame.display.flip()
+                # pygame.display.flip()
 
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
@@ -451,15 +445,15 @@ while running:
         if game.level.start_time:
             game.level.show_time()  # отображает время, прошедшее с начала игры
         else:
-            screen.blit(game.font.render('Time: 00:00', True, game.text_color), (0, 0))
+            screen.blit(game.font.render('Time: 00:00', True, game.text_color), (1, 2))
 
         clock.tick(game.level.fps)
 
         sprite_ball.draw(screen)
         sprite_platform.draw(screen)
 
-        for el in blocks:
-            screen.blit(el.block_image, (el.rect.x, el.rect.y))
+        for block in sprite_blocks:
+            block.draw(screen)
 
         sprite_platform.update()
         sprite_ball.update()
