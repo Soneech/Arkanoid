@@ -336,12 +336,14 @@ class Level(DataBase, pygame.sprite.Sprite):
 
         if len(sprite_blocks) == 0:
             self.win()
+        print(len(sprite_blocks) == len(sprite_break_blocks))
 
     def win(self):
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
         self.complete_level()
 
     def complete_level(self):
+        sprite_break_blocks.clear()
         sprite_blocks.clear()
         self.ball_move = False
         game.start_game = False
