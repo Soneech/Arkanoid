@@ -102,7 +102,7 @@ class LevelsMenu(DataBase):
         new_time = new_minutes + new_seconds
         new_lives = start_lives - lives  # т.е. потраченные жизни
 
-        if len(self.scores) == level_num + 1:
+        if len(self.scores) >= level_num + 1:
             scores = list(self.scores[level_num])
             old_time = scores[1].split(':')
             old_minutes = int(old_time[0])
@@ -204,12 +204,48 @@ class Border(pygame.sprite.Sprite):
             self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
 
 
-class Blocks(pygame.sprite.Sprite):
+class GreyBlock(pygame.sprite.Sprite):
     image = load_image('block1.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
-        self.block_image = Blocks.image
+        self.block_image = GreyBlock.image
+        self.rect = self.block_image.get_rect()
+        self.rect.x = self.rect[2] * x + 5
+        self.rect.y = self.rect[3] * y + 50
+        sprite_blocks.append(block)
+
+
+class BlueBlock(pygame.sprite.Sprite):
+    image = load_image('block1.png')
+    def __init__(self, block, x, y):
+        super().__init__(block)
+        self.add(block)
+        self.block_image = GreyBlock.image
+        self.rect = self.block_image.get_rect()
+        self.rect.x = self.rect[2] * x + 5
+        self.rect.y = self.rect[3] * y + 50
+        sprite_blocks.append(block)
+
+
+class WhiteBlock(pygame.sprite.Sprite):
+    image = load_image('block1.png')
+    def __init__(self, block, x, y):
+        super().__init__(block)
+        self.add(block)
+        self.block_image = GreyBlock.image
+        self.rect = self.block_image.get_rect()
+        self.rect.x = self.rect[2] * x + 5
+        self.rect.y = self.rect[3] * y + 50
+        sprite_blocks.append(block)
+
+
+class PurpleBlock(pygame.sprite.Sprite):
+    image = load_image('block1.png')
+    def __init__(self, block, x, y):
+        super().__init__(block)
+        self.add(block)
+        self.block_image = GreyBlock.image
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
@@ -224,9 +260,9 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.start_time = None
         self.ball_move = False
         screen.fill((29, 34, 41))
+        self.load_level(level_num)
 
-
-    def load_level(self):
+    def load_level(self, level_num):
         self.level_num = level_num
         self.level_map_file = self.level_info[1]
         self.fps = self.level_info[2]
@@ -236,9 +272,15 @@ class Level(DataBase, pygame.sprite.Sprite):
         with open('data/data_base&levels_maps/' + self.level_map_file, encoding='utf-8-sig') as file:
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
-                for x, elem in enumerate(row[0]):
-                    if elem == '*':
-                        Blocks(pygame.sprite.Group(), x, y)
+                for x, block_style in enumerate(row[0]):
+                    if block_style == 'g':
+                        GreyBlock(pygame.sprite.Group(), x, y)
+                    elif block_style == 'b':
+                        BlueBlock(pygame.sprite.Group(), x, y)
+                    elif block_style == 'w':
+                        WhiteBlock(pygame.sprite.Group(), x, y)
+                    elif block_style == 'p':
+                        PurpleBlock(pygame.sprite.Group(), x, y)
 
     def start_timer(self):
         self.start_time = pygame.time.get_ticks()  # время старта уровня
@@ -295,6 +337,7 @@ class Game:
     def __init__(self):
         self.ball = Ball(sprite_ball)
         self.platform = Platform(sprite_platform)
+        self.compl_levels = 0  # кол-во пройденных уровней начиная с 1
 
         self.font = pygame.font.SysFont('Sans', 24)
         self.text_color = (73, 248, 254)
@@ -321,6 +364,9 @@ class Game:
         self.in_levels_menu = False
         self.start_game = True
         self.level = Level(level_num)
+
+    def completed_levels(self):
+        self.compl_levels = len(DataBase.data_base.execute('SELECT level FROM User_scores').fetchall())
 
     def change_button_style(self, name, button, coord):  # меняет стиль кнопки
         self.button = button
@@ -373,12 +419,13 @@ while running:
             elif game.in_levels_menu:  # переходы из меню уровней
                 # получение координат нажатой кнопки и её имени(start/back)
                 for level_num, coord in enumerate(game.levels_menu.buttons_data):
-                    x, y = event.pos
-                    x1, y1 = coord  # координаты кнопок
-                    clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
-                    if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
-                        game.start_level(level_num)
-                        game.level.load_level()
+                    if level_num + 1 <= game.compl_levels + 1:
+                        x, y = event.pos
+                        x1, y1 = coord  # координаты кнопок
+                        clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
+                        if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
+                            game.start_level(level_num)
+                            #game.level.load_level()
 
                 x, y = event.pos
                 clicked_button_name = game.levels_menu.back_button_ckeck(x, y)
@@ -457,6 +504,7 @@ while running:
 
         sprite_platform.update()
         sprite_ball.update()
+    game.completed_levels()
 
     pygame.display.flip()
 
