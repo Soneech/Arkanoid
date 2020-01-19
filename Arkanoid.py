@@ -11,7 +11,7 @@ running = True
 sprite_ball = pygame.sprite.Group()
 sprite_platform = pygame.sprite.Group()
 sprite_blocks = []  # списко блоков-спрайтов
-sprite_break_blocks = []
+sprite_broken_blocks = []
 
 top_border = pygame.sprite.Group()
 bottom_border = pygame.sprite.Group()
@@ -213,20 +213,21 @@ class GreyBlock(pygame.sprite.Sprite):
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'grey'])
+        sprite_blocks.append([block, 'grey', self.rect.x, self.rect.y])
 
 
-class BreakBlock(pygame.sprite.Sprite):
+class BrokenBlock(pygame.sprite.Sprite):
     image = load_image('break_block.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
+        self.sprite = block
         self.block_image = GreyBlock.image
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_break_blocks.append([block, 'break'])
 
+        #sprite_broken_blocks.append([block, 'break'])
 
 class BlueBlock(pygame.sprite.Sprite):
     image = load_image('blue_block.png')
@@ -271,7 +272,7 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.level_info = list(self.level_info[level_num])
         self.start_time = None
         self.ball_move = False
-        screen.fill((29, 34, 41))
+        screen.fill((41, 41, 41))
         self.load_level(level_num)
 
     def load_level(self, level_num):
@@ -285,10 +286,10 @@ class Level(DataBase, pygame.sprite.Sprite):
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
                 for x, block_style in enumerate(row[0]):
-                    if block_style != '_':
-                        # сломанные блоки создаются на каждый существующий блок,
-                        # но заменяются только серые блоки
-                        BreakBlock(pygame.sprite.Group(), x, y)
+                    # if block_style != '_':
+                    #     # сломанные блоки создаются на каждый существующий блок,
+                    #     # но заменяются только серые блоки
+                    #     BrokenBlock(pygame.sprite.Group(), x, y)
                     if block_style == 'g':
                         GreyBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'b':
@@ -299,11 +300,12 @@ class Level(DataBase, pygame.sprite.Sprite):
                         PurpleBlock(pygame.sprite.Group(), x, y)
 
     def start_timer(self):
-        self.start_time = pygame.time.get_ticks()  # время старта уровня
+        self.start_time = pygame.time.get_ticks() // 1000  # кол-во миллисекунд с момента pygame.init()
 
     def show_time(self):
-        self.time_since_start1 = (pygame.time.get_ticks() - self.start_time)  # в миллисекундах
-        self.time_since_start = (pygame.time.get_ticks() - self.start_time) // 1000
+        # в миллисекундах (понадобится в функции pause)
+        #self.time_since_start1 = (pygame.time.get_ticks() - self.start_time)
+        self.time_since_start = (pygame.time.get_ticks() // 1000 - self.start_time)
 
         self.minutes = self.time_since_start // 60
         self.seconds = self.time_since_start % 60
@@ -329,21 +331,23 @@ class Level(DataBase, pygame.sprite.Sprite):
 
     def break_blocks(self, i):
         if sprite_blocks[i][1] == 'grey':
-            sprite_blocks[i] = sprite_break_blocks[i]
+            x, y = sprite_blocks[i][2], sprite_blocks[i][3]
+            broken_block = BrokenBlock(pygame.sprite.Group(), x, y)
+            sprite_blocks[i] = [broken_block.sprite, 'broken']
         else:
             del sprite_blocks[i]
-            del sprite_break_blocks[i]
+            # del sprite_broken_blocks[i]
 
         if len(sprite_blocks) == 0:
             self.win()
-        print(len(sprite_blocks) == len(sprite_break_blocks))
+        #print(len(sprite_blocks) == len(sprite_broken_blocks))
 
     def win(self):
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
         self.complete_level()
 
     def complete_level(self):
-        sprite_break_blocks.clear()
+        sprite_broken_blocks.clear()
         sprite_blocks.clear()
         self.ball_move = False
         game.start_game = False
@@ -402,21 +406,39 @@ Border(width - 5, 50, width - 5, height - 5, 'right')
 def pause():
     pause = True
     while pause:
-        time = pygame.time.get_ticks()
+        time = pygame.time.get_ticks()  // 1000  # кол-во секунд с момента pygame.init()
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE:  # продолжение игры
                     pause = False
                     # время, проведённое "в паузе"
-                    pause_time = time - game.level.time_since_start1 - game.level.start_time
+                    pause_time = time - game.level.time_since_start - game.level.start_time
                     game.level.start_time += pause_time
+
+                if event.key == pygame.K_ESCAPE:  # можно покинуть уровень, не снимая с паузы
+                    pause = False
+                    game.level.complete_level()
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if game.in_menu:
+                    running = False
+
+                if game.in_levels_menu:
+                    game.open_main_menu()
+
+                if game.start_game:
+                    game.level.complete_level()
+            if event.key == pygame.K_SPACE:
+                if game.start_game:
+                    pause()
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             x, y, = event.pos
 
             if game.start_game:
@@ -448,20 +470,6 @@ while running:
                 clicked_button_name = game.levels_menu.back_button_ckeck(x, y)
                 if clicked_button_name == 'back':
                     game.open_main_menu()
-
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                if game.in_menu:
-                    running = False
-
-                if game.in_levels_menu:
-                    game.open_main_menu()
-
-                if game.start_game:
-                    game.level.complete_level()
-            if event.key == pygame.K_SPACE:
-                if game.start_game:
-                    pause()
 
         elif event.type == pygame.MOUSEMOTION:  # смена стиля кнопок при наведении на них
             x, y, = event.pos
@@ -500,7 +508,6 @@ while running:
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
                                                                                                 (65, 459))
-                # pygame.display.flip()
 
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
