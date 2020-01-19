@@ -11,7 +11,6 @@ running = True
 sprite_ball = pygame.sprite.Group()
 sprite_platform = pygame.sprite.Group()
 sprite_blocks = []  # списко блоков-спрайтов
-sprite_broken_blocks = []
 
 top_border = pygame.sprite.Group()
 bottom_border = pygame.sprite.Group()
@@ -176,7 +175,7 @@ class Platform(pygame.sprite.Sprite):
         self.platform_image = Platform.image
         self.rect = self.platform_image.get_rect()
         self.rect.x = width // 2 - self.rect[2] // 2
-        self.rect.y = (height - 170)
+        self.rect.y = (height - 80)
 
     def update(self):
         x, y = pygame.mouse.get_pos()
@@ -204,30 +203,17 @@ class Border(pygame.sprite.Sprite):
             self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
 
 
-class GreyBlock(pygame.sprite.Sprite):
-    image = load_image('grey_block.png')
+class YellowBlock(pygame.sprite.Sprite):
+    image = load_image('green_block.png')
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
-        self.block_image = GreyBlock.image
+        self.block_image = YellowBlock.image
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'grey', self.rect.x, self.rect.y])
+        sprite_blocks.append([block, 'grey'])
 
-
-class BrokenBlock(pygame.sprite.Sprite):
-    image = load_image('break_block.png')
-    def __init__(self, block, x, y):
-        super().__init__(block)
-        self.add(block)
-        self.sprite = block
-        self.block_image = GreyBlock.image
-        self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
-        self.rect.y = self.rect[3] * y + 50
-
-        #sprite_broken_blocks.append([block, 'break'])
 
 class BlueBlock(pygame.sprite.Sprite):
     image = load_image('blue_block.png')
@@ -246,7 +232,7 @@ class VioletBlock(pygame.sprite.Sprite):
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
-        self.block_image = GreyBlock.image
+        self.block_image = VioletBlock.image
         self.rect = self.block_image.get_rect()
         self.rect.x = self.rect[2] * x + 5
         self.rect.y = self.rect[3] * y + 50
@@ -286,25 +272,19 @@ class Level(DataBase, pygame.sprite.Sprite):
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
                 for x, block_style in enumerate(row[0]):
-                    # if block_style != '_':
-                    #     # сломанные блоки создаются на каждый существующий блок,
-                    #     # но заменяются только серые блоки
-                    #     BrokenBlock(pygame.sprite.Group(), x, y)
-                    if block_style == 'g':
-                        GreyBlock(pygame.sprite.Group(), x, y)
+                    if block_style == 'y':
+                        YellowBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'b':
                         BlueBlock(pygame.sprite.Group(), x, y)
-                    elif block_style == 'w':
+                    elif block_style == 'v':
                         VioletBlock(pygame.sprite.Group(), x, y)
                     elif block_style == 'p':
                         PurpleBlock(pygame.sprite.Group(), x, y)
 
     def start_timer(self):
-        self.start_time = pygame.time.get_ticks() // 1000  # кол-во миллисекунд с момента pygame.init()
+        self.start_time = pygame.time.get_ticks() // 1000  # кол-во секунд с момента pygame.init()
 
     def show_time(self):
-        # в миллисекундах (понадобится в функции pause)
-        #self.time_since_start1 = (pygame.time.get_ticks() - self.start_time)
         self.time_since_start = (pygame.time.get_ticks() // 1000 - self.start_time)
 
         self.minutes = self.time_since_start // 60
@@ -330,24 +310,15 @@ class Level(DataBase, pygame.sprite.Sprite):
             self.complete_level()
 
     def break_blocks(self, i):
-        if sprite_blocks[i][1] == 'grey':
-            x, y = sprite_blocks[i][2], sprite_blocks[i][3]
-            broken_block = BrokenBlock(pygame.sprite.Group(), x, y)
-            sprite_blocks[i] = [broken_block.sprite, 'broken']
-        else:
-            del sprite_blocks[i]
-            # del sprite_broken_blocks[i]
-
+        del sprite_blocks[i]
         if len(sprite_blocks) == 0:
             self.win()
-        #print(len(sprite_blocks) == len(sprite_broken_blocks))
 
     def win(self):
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
         self.complete_level()
 
     def complete_level(self):
-        sprite_broken_blocks.clear()
         sprite_blocks.clear()
         self.ball_move = False
         game.start_game = False
@@ -399,9 +370,9 @@ game = Game()
 game.open_main_menu()
 
 Border(5, 50, width - 5, 5, 'top')
-Border(5, height - 5, width - 5, height - 5, 'bottom')
-Border(5, 50, 5, height - 5, 'left')
-Border(width - 5, 50, width - 5, height - 5, 'right')
+Border(5, height - 20, width - 5, height - 20, 'bottom')
+Border(5, 50, 5, height - 20, 'left')
+Border(width - 5, 50, width - 5, height - 20, 'right')
 
 def pause():
     pause = True
@@ -438,7 +409,7 @@ while running:
                 if game.start_game:
                     pause()
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN:
             x, y, = event.pos
 
             if game.start_game:
@@ -464,7 +435,6 @@ while running:
                         clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
                         if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
                             game.start_level(level_num)
-                            #game.level.load_level()
 
                 x, y = event.pos
                 clicked_button_name = game.levels_menu.back_button_ckeck(x, y)
@@ -508,7 +478,6 @@ while running:
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
                                                                                                 (65, 459))
-
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
         game.level.show_lives()  # отображает жизни
