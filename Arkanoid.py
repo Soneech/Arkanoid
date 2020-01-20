@@ -2,9 +2,11 @@ import pygame
 import os
 import sqlite3
 import csv
+import time
+from random import choice
 
 pygame.init()
-size = width, height, = 810, 650
+size = width, height, = 890, 650
 screen = pygame.display.set_mode(size)
 
 running = True
@@ -23,17 +25,10 @@ def load_image(name):
     image = pygame.image.load(fullname)
     return image
 
-
-def open_data_base(name):
-    fullname = os.path.join('data', 'data_base&levels_maps', name)
-    data_base = sqlite3.connect(fullname)
-    return data_base
-
 class DataBase:
-    data_base = open_data_base('DataBase.db')
-
     def __init__(self):
-        self.data_base = DataBase.data_base
+        fullname = 'data\data_base&levels_maps\DataBase.db'
+        self.data_base = sqlite3.connect(fullname)
         self.data_base_cur = self.data_base.cursor()
 
 
@@ -41,23 +36,23 @@ class MainMenu:
     def __init__(self):
         self.background = load_image('background.png')
         screen.blit(self.background, (0, 0))
-        screen.blit(game.font1.render('A R K A N O I D', True, game.text_color1), (284, 130))
+        screen.blit(game.title_font.render('A R K A N O I D', True, game.title_color), (328, 130))
 
         self.open_levels_menu_button = load_image('startButton.png')
-        screen.blit(self.open_levels_menu_button, (315, 230))
+        screen.blit(self.open_levels_menu_button, (355, 230))
 
         self.exit_button = load_image('exitButton.png')
-        screen.blit(self.exit_button, (315, 345))
+        screen.blit(self.exit_button, (355, 345))
 
         self.buttons_rect = self.open_levels_menu_button.get_rect()
 
     def button_check(self, x, y):  # координаты клика
         # (315;230) - координаты кнопки play в главном меню
-        if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
+        if ((x > 355 and x < 355 + game.main_menu.buttons_rect[2]) and
             y > 230 and y < 230 + game.main_menu.buttons_rect[3]):
             return 'play'
         # (315;345) - координаты кнопки exit в главном меню
-        if ((x > 315 and x < 315 + game.main_menu.buttons_rect[2]) and
+        if ((x > 355 and x < 355 + game.main_menu.buttons_rect[2]) and
             y > 345 and y < 345 + game.main_menu.buttons_rect[3]):
             return 'exit'
 
@@ -77,10 +72,10 @@ class LevelsMenu(DataBase):
         for coord in self.buttons_data:
             x, y = coord
             screen.blit(self.start_game_button, (x, y))
-        screen.blit(self.back_button, (65, 459))
+        screen.blit(self.back_button, (100, 500))
 
-        screen.blit(game.font.render('Time', True, game.text_color), (250, 50))
-        screen.blit(game.font.render('Lives', True, game.text_color), (400, 50))
+        screen.blit(game.font.render('Time', True, game.text_color), (380, 30))
+        screen.blit(game.font.render('Lives', True, game.text_color), (600, 30))
 
         self.scores = self.data_base.execute('SELECT level, time, lives FROM User_scores').fetchall()
 
@@ -88,8 +83,8 @@ class LevelsMenu(DataBase):
         if len(self.scores) != 0:
             for elem in self.scores:
                 level, time, lives = elem
-                screen.blit(game.font.render(time, True, game.text_color), (250, 90 + 95 * int(level - 1)))
-                screen.blit(game.font.render(str(lives), True, game.text_color), (400, 90 + 95 * int(level - 1)))
+                screen.blit(game.font.render(time, True, game.text_color), (380, 120 + 95 * int(level - 1)))
+                screen.blit(game.font.render(str(lives), True, game.text_color), (615, 120 + 95 * int(level - 1)))
 
     def add_result_to_db(self, level_num, time, lives, start_lives):  # level_num - номер уровня, начиная с 0
         new_minutes = str(time // 60)
@@ -127,8 +122,8 @@ class LevelsMenu(DataBase):
             return 'start'
 
     def back_button_ckeck(self, x, y):  # x, y - координаты клика
-        if ((x > 65 and x < 65 + game.main_menu.buttons_rect[2]) and
-            y > 459 and y < 459 + game.main_menu.buttons_rect[3]):
+        if ((x > 100 and x < 100 + game.main_menu.buttons_rect[2]) and
+            y > 500 and y < 500 + game.main_menu.buttons_rect[3]):
             return 'back'
 
 
@@ -144,8 +139,9 @@ class Ball(pygame.sprite.Sprite):
 
     def update(self):
         if not game.level.ball_move:  # если движение шарика не начато, он должен находиться на платформе
-            self.rect.x = game.platform.rect.x
+            self.rect.x = game.platform.rect.x + 63
             self.rect.y = game.platform.rect.y - self.rect[3]
+            self.vx = choice([-3, 3])
         else:
             self.rect = self.rect.move(self.vx, self.vy)
             if pygame.sprite.spritecollideany(self, sprite_platform):  # столкновение с платформой
@@ -161,7 +157,7 @@ class Ball(pygame.sprite.Sprite):
                 game.level.ball_fell()
 
             for i, sprite_block in enumerate(sprite_blocks):
-                if pygame.sprite.spritecollideany(self, sprite_block[0]):
+                if pygame.sprite.spritecollideany(self, sprite_block):
                     self.vy = -self.vy
                     game.level.break_blocks(i)
 
@@ -183,7 +179,7 @@ class Platform(pygame.sprite.Sprite):
             x = 5
         elif x > width - 5 - self.rect[2]:
             x = width - 5 - self.rect[2]
-        self.rect.x = x
+        self.rect.x = x  # платформа перемещается только горизонатльно
 
 
 class Border(pygame.sprite.Sprite):
@@ -210,9 +206,9 @@ class YellowBlock(pygame.sprite.Sprite):
         self.add(block)
         self.block_image = YellowBlock.image
         self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
+        self.rect.x = self.rect[2] * x + 6
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'grey'])
+        sprite_blocks.append(block)
 
 
 class BlueBlock(pygame.sprite.Sprite):
@@ -222,9 +218,9 @@ class BlueBlock(pygame.sprite.Sprite):
         self.add(block)
         self.block_image = BlueBlock.image
         self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
+        self.rect.x = self.rect[2] * x + 6
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'blue'])
+        sprite_blocks.append(block)
 
 
 class VioletBlock(pygame.sprite.Sprite):
@@ -234,9 +230,9 @@ class VioletBlock(pygame.sprite.Sprite):
         self.add(block)
         self.block_image = VioletBlock.image
         self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
+        self.rect.x = self.rect[2] * x + 6
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'violet'])
+        sprite_blocks.append(block)
 
 
 class PurpleBlock(pygame.sprite.Sprite):
@@ -246,9 +242,9 @@ class PurpleBlock(pygame.sprite.Sprite):
         self.add(block)
         self.block_image = PurpleBlock.image
         self.rect = self.block_image.get_rect()
-        self.rect.x = self.rect[2] * x + 5
+        self.rect.x = self.rect[2] * x + 6
         self.rect.y = self.rect[3] * y + 50
-        sprite_blocks.append([block, 'purple'])
+        sprite_blocks.append(block)
 
 
 class Level(DataBase, pygame.sprite.Sprite):
@@ -267,6 +263,10 @@ class Level(DataBase, pygame.sprite.Sprite):
         self.fps = self.level_info[2]
         self.lives = self.level_info[3]
         self.start_lives = self.lives
+        self.balls = []  # список изображений шарика(показывает оставшиеся жизни)
+        for i in range(self.lives):  # в основном цикле идёт отрисовка
+            ball_image = load_image('ball.png')
+            self.balls.append([ball_image, width - 45 - 30 * i, 5])
 
         with open('data/data_base&levels_maps/' + self.level_map_file, encoding='utf-8-sig') as file:
             level_map = list(csv.reader(file))
@@ -297,17 +297,18 @@ class Level(DataBase, pygame.sprite.Sprite):
             seconds = '0' + str(self.seconds)
 
         message = 'Time: ' + str(minute) + str(seconds)
-        screen.blit(game.font.render(message, True, game.text_color), (1, 2))
+        screen.blit(game.font.render(message, True, game.text_color), (20, 2))
 
     def show_lives(self):
-        lives = 'Lives: ' + str(self.lives)
-        screen.blit(game.font.render(lives, True, game.text_color), (741, 2))
+        for ball in self.balls:
+            screen.blit(ball[0], (ball[1], ball[2]))
 
     def ball_fell(self):
         self.ball_move = False
+        del self.balls[-1]
         self.lives -= 1  # при падении тратится кол-во попыток
         if self.lives == 0:
-            self.complete_level()
+            self.game_over()
 
     def break_blocks(self, i):
         del sprite_blocks[i]
@@ -315,7 +316,16 @@ class Level(DataBase, pygame.sprite.Sprite):
             self.win()
 
     def win(self):
+        screen.blit(game.title_font.render('You win!', True, game.win_color), (360, 410))
+        pygame.display.flip()
+        time.sleep(2)
         game.levels_menu.add_result_to_db(self.level_num, self.time_since_start, self.lives, self.start_lives)
+        self.complete_level()
+
+    def game_over(self):
+        screen.blit(game.title_font.render('Game over', False, game.fail_color), (360, 410))
+        pygame.display.flip()
+        time.sleep(2)
         self.complete_level()
 
     def complete_level(self):
@@ -325,8 +335,9 @@ class Level(DataBase, pygame.sprite.Sprite):
         game.open_levels_menu()
 
 
-class Game:
+class Game(DataBase):
     def __init__(self):
+        super().__init__()
         self.ball = Ball(sprite_ball)
         self.platform = Platform(sprite_platform)
         self.compl_levels = 0  # кол-во пройденных уровней начиная с 1
@@ -334,8 +345,11 @@ class Game:
         self.font = pygame.font.SysFont('Sans', 24)
         self.text_color = (73, 248, 254)
 
-        self.font1 = pygame.font.SysFont('Sans', 40, True)  # шрифт для заставки(bold)
-        self.text_color1 = (70, 245, 255)
+        self.title_font = pygame.font.SysFont('Sans', 40, True)  # шрифт для заставки(bold)
+        self.title_color = (100, 150, 255)
+
+        self.fail_color = (255, 0, 0)
+        self.win_color = (0, 255, 0)
 
     def open_main_menu(self):
         self.main_menu = MainMenu()
@@ -358,7 +372,7 @@ class Game:
         self.level = Level(level_num)
 
     def completed_levels(self):
-        self.compl_levels = len(DataBase.data_base.execute('SELECT level FROM User_scores').fetchall())
+        self.compl_levels = len(self.data_base.execute('SELECT level FROM User_scores').fetchall())
 
     def change_button_style(self, name, button, coord):  # меняет стиль кнопки
         self.button = button
@@ -448,16 +462,16 @@ while running:
                 if hover_button_name == 'play':
                     # (315;230) - координаты кнопки play в главном меню
                     game.change_button_style('clickedStartButton.png', game.main_menu.open_levels_menu_button,
-                                                                                                (315, 230))
+                                                                                                (355, 230))
                 else:
-                    game.change_button_style('startButton.png', game.main_menu.exit_button, (315, 230))
+                    game.change_button_style('startButton.png', game.main_menu.exit_button, (355, 230))
 
                 if hover_button_name == 'exit':
                     # (315;345) - координаты кнопки exit в главном меню
                     game.change_button_style('clickedExitButton.png', game.main_menu.open_levels_menu_button,
-                                                                                                (315, 345))
+                                                                                                (355, 345))
                 else:
-                    game.change_button_style('exitButton.png', game.main_menu.exit_button, (315, 345))
+                    game.change_button_style('exitButton.png', game.main_menu.exit_button, (355, 345))
 
             elif game.in_levels_menu:
                 for coord in game.levels_menu.buttons_data:
@@ -474,10 +488,10 @@ while running:
                 if hover_button_name == 'back':
                     # (65;559) - координаты кнопки "back", возвращающей в главное меню
                     game.change_button_style('clickedBackButton.png', game.levels_menu.start_game_button,
-                                                                                                (65, 459))
+                                                                                                (100, 500))
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
-                                                                                                (65, 459))
+                                                                                                (100, 500))
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
         game.level.show_lives()  # отображает жизни
@@ -485,7 +499,7 @@ while running:
         if game.level.start_time:
             game.level.show_time()  # отображает время, прошедшее с начала игры
         else:
-            screen.blit(game.font.render('Time: 00:00', True, game.text_color), (1, 2))
+            screen.blit(game.font.render('Time: 00:00', True, game.text_color), (20, 2))
 
         clock.tick(game.level.fps)
 
@@ -493,7 +507,7 @@ while running:
         sprite_platform.draw(screen)
 
         for block in sprite_blocks:
-            block[0].draw(screen)
+            block.draw(screen)
 
         sprite_platform.update()
         sprite_ball.update()
