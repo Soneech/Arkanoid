@@ -6,6 +6,8 @@ import time
 from random import choice
 
 pygame.init()
+title = 'Arkanoid'
+pygame.display.set_caption(title)
 size = width, height, = 890, 650
 screen = pygame.display.set_mode(size)
 
@@ -400,7 +402,7 @@ def pause():
                     pause_time = time - game.level.time_since_start - game.level.start_time
                     game.level.start_time += pause_time
 
-                if event.key == pygame.K_ESCAPE:  # можно покинуть уровень, не снимая с паузы
+                elif event.key == pygame.K_ESCAPE:  # можно покинуть уровень, не снимая с паузы
                     pause = False
                     game.level.complete_level()
 
@@ -414,22 +416,22 @@ while running:
                 if game.in_menu:
                     running = False
 
-                if game.in_levels_menu:
+                elif game.in_levels_menu:
                     game.open_main_menu()
 
-                if game.start_game:
+                elif game.start_game:
                     game.level.complete_level()
-            if event.key == pygame.K_SPACE:
+            elif event.key == pygame.K_SPACE:
                 if game.start_game:
                     pause()
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             x, y, = event.pos
 
             if game.start_game:
                 game.level.ball_move = True  # начало движения шарика
                 if game.level.lives == game.level.start_lives:  # событие, происходищее только при старте уровня
-                    game.level.start_timer()
+                    game.level.start_timer()  # начало отсчёта времени
 
             elif game.in_menu:  # переходы из главного меню
                 # получение координат кнопки и её имени(play/exit)
@@ -437,17 +439,17 @@ while running:
                 if clicked_button_name == 'play':
                     game.open_levels_menu()  # переход в меню уровней
 
-                if clicked_button_name == 'exit':
+                elif clicked_button_name == 'exit':
                     running = False  # выход из игры
 
             elif game.in_levels_menu:  # переходы из меню уровней
                 # получение координат нажатой кнопки и её имени(start/back)
                 for level_num, coord in enumerate(game.levels_menu.buttons_data):
-                    if level_num + 1 <= game.compl_levels + 1:
+                    if level_num + 1 <= game.compl_levels + 1:  # открывает для прохождения следующий уровень
                         x, y = event.pos
                         x1, y1 = coord  # координаты кнопок
                         clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
-                        if clicked_button_name == 'start':  # если кнопка нажата, т.е. x1 и y1 != None
+                        if clicked_button_name == 'start':
                             game.start_level(level_num)
 
                 x, y = event.pos
@@ -457,17 +459,18 @@ while running:
 
         elif event.type == pygame.MOUSEMOTION:  # смена стиля кнопок при наведении на них
             x, y, = event.pos
-            if game.in_menu:  # кнопки главного меню (play, exit)
+            if game.in_menu:
+                # кнопки главного меню (play, exit)
                 hover_button_name = game.main_menu.button_check(x, y)
                 if hover_button_name == 'play':
-                    # (315;230) - координаты кнопки play в главном меню
+                    # (355;230) - координаты кнопки play в главном меню
                     game.change_button_style('clickedStartButton.png', game.main_menu.open_levels_menu_button,
                                                                                                 (355, 230))
                 else:
                     game.change_button_style('startButton.png', game.main_menu.exit_button, (355, 230))
 
                 if hover_button_name == 'exit':
-                    # (315;345) - координаты кнопки exit в главном меню
+                    # (355;345) - координаты кнопки exit в главном меню
                     game.change_button_style('clickedExitButton.png', game.main_menu.open_levels_menu_button,
                                                                                                 (355, 345))
                 else:
@@ -486,7 +489,7 @@ while running:
                                                                                                     (x1, y1))
                 hover_button_name = game.levels_menu.back_button_ckeck(x, y)
                 if hover_button_name == 'back':
-                    # (65;559) - координаты кнопки "back", возвращающей в главное меню
+                    # (100;500) - координаты кнопки "back", возвращающей в главное меню
                     game.change_button_style('clickedBackButton.png', game.levels_menu.start_game_button,
                                                                                                 (100, 500))
                 else:
@@ -494,7 +497,7 @@ while running:
                                                                                                 (100, 500))
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
-        game.level.show_lives()  # отображает жизни
+        game.level.show_lives()  # отображает жизни(в виде шариков)
 
         if game.level.start_time:
             game.level.show_time()  # отображает время, прошедшее с начала игры
