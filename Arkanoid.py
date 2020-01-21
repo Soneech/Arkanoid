@@ -14,7 +14,7 @@ screen = pygame.display.set_mode(size)
 running = True
 sprite_ball = pygame.sprite.Group()
 sprite_platform = pygame.sprite.Group()
-sprite_blocks = []  # списко блоков-спрайтов
+sprite_blocks = []  # список блоков-спрайтов
 
 top_border = pygame.sprite.Group()
 bottom_border = pygame.sprite.Group()
@@ -22,14 +22,16 @@ vertical_borders = pygame.sprite.Group()
 
 clock = pygame.time.Clock()
 
+
 def load_image(name):
     fullname = os.path.join('data', name)
     image = pygame.image.load(fullname)
     return image
 
+
 class DataBase:
     def __init__(self):
-        fullname = 'data\data_base&levels_maps\DataBase.db'
+        fullname = os.path.join('data', 'DataBaseAndLevelsMaps', 'DataBase.db')
         self.data_base = sqlite3.connect(fullname)
         self.data_base_cur = self.data_base.cursor()
 
@@ -49,13 +51,13 @@ class MainMenu:
         self.buttons_rect = self.open_levels_menu_button.get_rect()
 
     def button_check(self, x, y):  # координаты клика
-        # (315;230) - координаты кнопки play в главном меню
+        # (355;230) - координаты кнопки play в главном меню
         if ((x > 355 and x < 355 + game.main_menu.buttons_rect[2]) and
-            y > 230 and y < 230 + game.main_menu.buttons_rect[3]):
+                (y > 230 and y < 230 + game.main_menu.buttons_rect[3])):
             return 'play'
-        # (315;345) - координаты кнопки exit в главном меню
+        # (355;345) - координаты кнопки exit в главном меню
         if ((x > 355 and x < 355 + game.main_menu.buttons_rect[2]) and
-            y > 345 and y < 345 + game.main_menu.buttons_rect[3]):
+                (y > 345 and y < 345 + game.main_menu.buttons_rect[3])):
             return 'exit'
 
 
@@ -113,19 +115,19 @@ class LevelsMenu(DataBase):
 
         else:
             self.data_base_cur.execute('INSERT INTO User_scores(level, time, lives) VALUES(?,?,?)',
-                                                            (level_num + 1, new_time, new_lives))
+                                       (level_num + 1, new_time, new_lives))
 
         self.data_base.commit()
         self.load_scores_table()
 
     def start_buttons_check(self, x, y):  # x и y - координаты клика, x1 и y1 - координаты кнопок
         if ((x > x1 and x < x1 + game.levels_menu.buttons_rect[2]) and
-            y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3]):
+                (y >= y1 and y <= y1 + game.levels_menu.buttons_rect[3])):
             return 'start'
 
     def back_button_ckeck(self, x, y):  # x, y - координаты клика
         if ((x > 100 and x < 100 + game.main_menu.buttons_rect[2]) and
-            y > 500 and y < 500 + game.main_menu.buttons_rect[3]):
+                (y > 500 and y < 500 + game.main_menu.buttons_rect[3])):
             return 'back'
 
 
@@ -202,7 +204,8 @@ class Border(pygame.sprite.Sprite):
 
 
 class YellowBlock(pygame.sprite.Sprite):
-    image = load_image('green_block.png')
+    image = load_image('yellowBlock.png')
+
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -214,7 +217,8 @@ class YellowBlock(pygame.sprite.Sprite):
 
 
 class BlueBlock(pygame.sprite.Sprite):
-    image = load_image('blue_block.png')
+    image = load_image('blueBlock.png')
+
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -226,7 +230,8 @@ class BlueBlock(pygame.sprite.Sprite):
 
 
 class VioletBlock(pygame.sprite.Sprite):
-    image = load_image('violet_block.png')
+    image = load_image('violetBlock.png')
+
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -238,7 +243,8 @@ class VioletBlock(pygame.sprite.Sprite):
 
 
 class PurpleBlock(pygame.sprite.Sprite):
-    image = load_image('purple_block.png')
+    image = load_image('purpleBlock.png')
+
     def __init__(self, block, x, y):
         super().__init__(block)
         self.add(block)
@@ -270,7 +276,7 @@ class Level(DataBase, pygame.sprite.Sprite):
             ball_image = load_image('ball.png')
             self.balls.append([ball_image, width - 45 - 30 * i, 5])
 
-        with open('data/data_base&levels_maps/' + self.level_map_file, encoding='utf-8-sig') as file:
+        with open('data/DataBaseAndLevelsMaps/' + self.level_map_file, encoding='utf-8-sig') as file:
             level_map = list(csv.reader(file))
             for y, row in enumerate(level_map):
                 for x, block_style in enumerate(row[0]):
@@ -374,6 +380,7 @@ class Game(DataBase):
         self.level = Level(level_num)
 
     def completed_levels(self):
+        # кол-во пройденных уровней начиная с 1
         self.compl_levels = len(self.data_base.execute('SELECT level FROM User_scores').fetchall())
 
     def change_button_style(self, name, button, coord):  # меняет стиль кнопки
@@ -390,10 +397,11 @@ Border(5, height - 20, width - 5, height - 20, 'bottom')
 Border(5, 50, 5, height - 20, 'left')
 Border(width - 5, 50, width - 5, height - 20, 'right')
 
+
 def pause():
     pause = True
     while pause:
-        time = pygame.time.get_ticks()  // 1000  # кол-во секунд с момента pygame.init()
+        time = pygame.time.get_ticks() // 1000  # кол-во секунд с момента pygame.init()
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:  # продолжение игры
@@ -405,6 +413,7 @@ def pause():
                 elif event.key == pygame.K_ESCAPE:  # можно покинуть уровень, не снимая с паузы
                     pause = False
                     game.level.complete_level()
+
 
 while running:
     for event in pygame.event.get():
@@ -448,7 +457,7 @@ while running:
                     if level_num + 1 <= game.compl_levels + 1:  # открывает для прохождения следующий уровень
                         x, y = event.pos
                         x1, y1 = coord  # координаты кнопок
-                        clicked_button_name  = game.levels_menu.start_buttons_check(x, y)
+                        clicked_button_name = game.levels_menu.start_buttons_check(x, y)
                         if clicked_button_name == 'start':
                             game.start_level(level_num)
 
@@ -465,14 +474,14 @@ while running:
                 if hover_button_name == 'play':
                     # (355;230) - координаты кнопки play в главном меню
                     game.change_button_style('clickedStartButton.png', game.main_menu.open_levels_menu_button,
-                                                                                                (355, 230))
+                                             (355, 230))
                 else:
                     game.change_button_style('startButton.png', game.main_menu.exit_button, (355, 230))
 
                 if hover_button_name == 'exit':
                     # (355;345) - координаты кнопки exit в главном меню
                     game.change_button_style('clickedExitButton.png', game.main_menu.open_levels_menu_button,
-                                                                                                (355, 345))
+                                             (355, 345))
                 else:
                     game.change_button_style('exitButton.png', game.main_menu.exit_button, (355, 345))
 
@@ -483,18 +492,18 @@ while running:
                     hover_button_name = game.levels_menu.start_buttons_check(x, y)
                     if hover_button_name == 'start':
                         game.change_button_style('clickedStartLevelButton.png', game.levels_menu.start_game_button,
-                                                                                                        (x1, y1))
+                                                 (x1, y1))
                     if not hover_button_name:  # переводит кнопку старта в обычное состояние
                         game.change_button_style('startLevelButton.png', game.levels_menu.start_game_button,
-                                                                                                    (x1, y1))
+                                                 (x1, y1))
                 hover_button_name = game.levels_menu.back_button_ckeck(x, y)
                 if hover_button_name == 'back':
                     # (100;500) - координаты кнопки "back", возвращающей в главное меню
                     game.change_button_style('clickedBackButton.png', game.levels_menu.start_game_button,
-                                                                                                (100, 500))
+                                             (100, 500))
                 else:
                     game.change_button_style('backButton.png', game.levels_menu.start_game_button,
-                                                                                                (100, 500))
+                                             (100, 500))
     if game.start_game:  # действия во время игры
         screen.fill((29, 34, 41))
         game.level.show_lives()  # отображает жизни(в виде шариков)
