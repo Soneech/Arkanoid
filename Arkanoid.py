@@ -431,7 +431,7 @@ while running:
                 elif game.start_game:
                     game.level.complete_level()
             elif event.key == pygame.K_SPACE:
-                if game.start_game:
+                if game.level.ball_move:
                     pause()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
